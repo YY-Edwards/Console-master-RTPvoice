@@ -1,0 +1,129 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="源文件">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="头文件">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="资源文件">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="头文件\FifoQueue">
+      <UniqueIdentifier>{5b51529d-b7e2-47e4-a0c0-c86542a5f023}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="头文件\MyRTP">
+      <UniqueIdentifier>{e55866c4-b965-4e1b-8836-afb5a4acc23d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="头文件\SynInterface">
+      <UniqueIdentifier>{50868ba8-5d39-4532-9197-ff9465244f2c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="头文件\SocketWrap">
+      <UniqueIdentifier>{be26afa3-657f-4300-8a3c-f528685fc774}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="头文件\Common">
+      <UniqueIdentifier>{24bb8e4c-d127-4d7e-96ac-70171b306b86}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="头文件\MyProtocol">
+      <UniqueIdentifier>{26ac2253-e33b-4220-874f-13a4b82f8235}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="源文件\FifoQueue">
+      <UniqueIdentifier>{8a0bfccc-c729-4fd7-995d-69ee964bce67}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="源文件\MyRTP">
+      <UniqueIdentifier>{9cb2d41a-c3cd-4799-8d80-55e8f6d3270f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="源文件\Common">
+      <UniqueIdentifier>{2f06343b-b21c-402d-80c9-c7ad93fc9926}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="源文件\MyProtocol">
+      <UniqueIdentifier>{2d1149b6-93a9-4706-99f1-6957fac42945}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="源文件\SocketWrap">
+      <UniqueIdentifier>{90cdf755-7b17-4f37-a9d1-5f38aef7953e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="源文件\SynInterface">
+      <UniqueIdentifier>{c1dc660f-9be3-4ba8-bee0-eeccfa8c7be2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="头文件\ClientObj">
+      <UniqueIdentifier>{609545ee-d0a4-475e-be4c-b21b490f9f7d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="源文件\ClientObj">
+      <UniqueIdentifier>{97f68fa2-8618-4512-97ff-8db26cb21389}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="ReadMe.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="stdafx.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="targetver.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\MyRTP\myrtp.h">
+      <Filter>头文件\MyRTP</Filter>
+    </ClInclude>
+    <ClInclude Include="src\MyProtocol\myprotocol.h">
+      <Filter>头文件\MyProtocol</Filter>
+    </ClInclude>
+    <ClInclude Include="src\FifoQueue\fifoqueue.h">
+      <Filter>头文件\FifoQueue</Filter>
+    </ClInclude>
+    <ClInclude Include="src\SocketWrap\socketwrap.h">
+      <Filter>头文件\SocketWrap</Filter>
+    </ClInclude>
+    <ClInclude Include="src\SynInterface\syninterface.h">
+      <Filter>头文件\SynInterface</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Common\common.h">
+      <Filter>头文件\Common</Filter>
+    </ClInclude>
+    <ClInclude Include="src\myinclude.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\mymaster.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\clientobj.h">
+      <Filter>头文件\ClientObj</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="stdafx.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="ConsoleApplication-RTPVoice.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\MyProtocol\myprotocol.cpp">
+      <Filter>源文件\MyProtocol</Filter>
+    </ClCompile>
+    <ClCompile Include="src\MyRTP\myrtp.cpp">
+      <Filter>源文件\MyRTP</Filter>
+    </ClCompile>
+    <ClCompile Include="src\SynInterface\syninterface.cpp">
+      <Filter>源文件\SynInterface</Filter>
+    </ClCompile>
+    <ClCompile Include="src\SocketWrap\socketwrap.cpp">
+      <Filter>源文件\SocketWrap</Filter>
+    </ClCompile>
+    <ClCompile Include="src\FifoQueue\fifoqueue.cpp">
+      <Filter>源文件\FifoQueue</Filter>
+    </ClCompile>
+    <ClCompile Include="src\mymaster.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\clientobj.cpp">
+      <Filter>源文件\ClientObj</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ClassDiagram.cd" />
+  </ItemGroup>
+</Project>
