@@ -39,7 +39,7 @@ using namespace std;
 #define						CHANNEL2RTPSSRC							2012
 
 #define						TCPPORT									57000
-#define						BUFLENGTH								1024
+#define						BUFLENGTH								2048
 
 #define						PROTOCOL_HEAD							0x01
 #define						PROTOCOL_PACKAGE_LENGTH_SIZE			4

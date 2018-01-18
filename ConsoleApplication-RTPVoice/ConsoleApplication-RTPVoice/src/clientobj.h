@@ -33,6 +33,13 @@ class ClientObj
 {
 public:
 	ClientObj(HSocket socketfd, void(*callBackFunc)(int, ResponeData));
+	bool IsClientObjActive()
+	{
+		if (clientfd != INVALID_SOCKET)
+			return true;
+		else
+			false;
+	}
 	~ClientObj();
 
 private:
@@ -85,6 +92,11 @@ private:
 	MyCreateThread * process_client_thread_p;
 	MyCreateThread * parse_thread_p;
 	HSocket clientfd;
+
+	char recvbuff[BUFLENGTH];
+	transresult_t rt;
+	StickDismantleOptions_t temp_option;
+
 
 };
 

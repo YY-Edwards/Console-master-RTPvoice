@@ -32,6 +32,12 @@ JProtocol::~JProtocol()
 			delete listen_thread_p[i];
 			listen_thread_p[i] = NULL;
 		}
+
+		if (clientobjarray[i] != NULL)
+		{
+			delete clientobjarray[i];
+			clientobjarray[i] = NULL;
+		}
 	}
 
 	jqueue.ClearQueue();
@@ -76,6 +82,8 @@ void JProtocol::InitProtocolData()
 	serversoc = INVALID_SOCKET;
 	listen_numb = 0;
 	memset(listen_thread_p, 0, MAX_LISTENING_COUNT*sizeof(MyCreateThread *));//注意大小问题
+	memset(clientobjarray, 0, MAX_LISTENING_COUNT*sizeof(ClientObj *));//注意大小问题
+
 	parse_thread_p = NULL;
 
 	RequestCallBackFunc = NULL;
@@ -398,7 +406,7 @@ int JProtocol::ListenThreadFunc()
 	HSocket currentclientsoc = INVALID_SOCKET;
 	struct sockaddr_in remote_addr; //client_address
 	
-	std::cout<<"The server is waiting for the connection \n"<<std::endl;
+	std::cout<<"The server is waiting for a newest connection \n"<<std::endl;
 	currentclientsoc = SocketAccept(serversoc, (sockaddr_in*)&remote_addr);
 
 	if (serversoc != INVALID_SOCKET)CreateListenThread();//服务器运行中则继续监听
@@ -410,24 +418,27 @@ int JProtocol::ListenThreadFunc()
 	}
 	else
 	{
-		//WaitForSingleObject(clientmap_locker, INFINITE);
 		clientmap_locker->Lock();
 		clientmap.insert(std::pair<HSocket, struct sockaddr_in>(currentclientsoc, remote_addr));//save client info(socketfd,ip,port...) to map
 		clientmap_locker->Unlock();
-		//ReleaseMutex(clientmap_locker);
-		return_value = ProcessClient(currentclientsoc);//while(1)
+
+
+		//return_value = ProcessClient(currentclientsoc);//while(1)
+
+		if (listen_numb < MAX_LISTENING_COUNT)
+		{
+			clientobjarray[client_numb++] = new ClientObj(currentclientsoc, RequestCallBackFunc);
+		}
 		
+		std::cout << "Create ClientObj finished and exit ListenThreadFunc: 0x"<< hex << GetCurrentThreadId() << std::endl;
 
-		//WaitForSingleObject(clientmap_locker, INFINITE);
-		clientmap_locker->Lock();
-		clientmap.erase(currentclientsoc);
-		clientmap_locker->Unlock();
-		//ReleaseMutex(clientmap_locker);
+		//clientmap_locker->Lock();
+		//clientmap.erase(currentclientsoc);
+		//clientmap_locker->Unlock();
 
-		SocketClose(currentclientsoc);
-		//CloseSocket(currentclientsoc);
+		//SocketClose(currentclientsoc);
 		//TRACE(("Erase clientfd ,Close socket and exit ProcessClientFunc: 0x%x\n"), GetCurrentThreadId());
-		std::cout << "Erase clientfd ,Close socket and exit ProcessClientFunc: 0x"<< hex << GetCurrentThreadId() << std::endl;
+		//std::cout << "Erase clientfd ,Close socket and exit ProcessClientFunc: 0x"<< hex << GetCurrentThreadId() << std::endl;
 	}
 
 	return return_value;
@@ -474,7 +485,7 @@ int JProtocol::ProcessClient(HSocket clientfd)
 			}
 
 			//stickdismantle_locker->Lock();
-			return_value = StickDismantleProtocol(clientfd, &recvbuff[0], rt.nbytes, temp_option);
+			//return_value = StickDismantleProtocol(clientfd, &recvbuff[0], rt.nbytes, temp_option);
 			//stickdismantle_locker->Unlock();
 
 			memset(&recvbuff[0], 0, BUFLENGTH);//clear recvbuf[BUFLENGTH];
@@ -498,118 +509,118 @@ int JProtocol::ProcessClient(HSocket clientfd)
 
 	return return_value;
 }
-int JProtocol::StickDismantleProtocol(HSocket clientfd, char *ptr, int ptr_len, StickDismantleOptions_t &option)
-{
-	int return_value = 0;
-	int32_t recv_length = ptr_len;
-	std::string len_str;
-	len_str.clear();
-
-	if (!ptr || ptr_len>BUFLENGTH) return -1;
-	memcpy(&option.data[option.count], ptr, ptr_len);
-
-Start:
-
-	if ((option.data[0] == PROTOCOL_HEAD) && (recv_length >= 5) && (option.bytes_remained == 0))//protocol start
-	{
-		memcpy((void*)len_str.c_str(), &option.data[1], PROTOCOL_PACKAGE_LENGTH_SIZE);
-		sscanf(len_str.c_str(), "%D", &option.pro_length);//string->int
-
-		option.bytes_remained = option.pro_length - (recv_length - 5);
-
-		if (option.bytes_remained == 0)
-		{
-			std::cout<<"recv_okay\n"<<std::endl;
-			PushRecvBuffToQueue(clientfd, &option.data[5], option.pro_length);
-			//clear temp
-			option.pro_length = 0;
-			option.count = 0;
-			memset(option.data, 0, BUFLENGTH);//clear data;
-		}
-		else if (option.bytes_remained > 0)//need  to stick the buff
-		{
-			std::cout<<"need to stick the buff\n"<<std::endl;
-			option.count += recv_length;
-
-		}
-		else//recv_length >(pro_length+5) (bytes_remained < 0)//need  to dismantle the buff
-		{
-			std::cout<<"need  to dismantle the buff\n"<<std::endl;
-			PushRecvBuffToQueue(clientfd, &option.data[5], option.pro_length);
-
-			memcpy(&option.data[0], &option.data[option.pro_length + 5], recv_length - 5 - option.pro_length);
-			memset(&option.data[recv_length - option.pro_length - 5], 0x00, BUFLENGTH - (recv_length - option.pro_length - 5));
-
-
-			recv_length = recv_length - 5 - option.pro_length;
-			option.bytes_remained = 0;
-			option.count = 0;
-			goto Start;
-
-		}
-
-	}
-	else if (option.bytes_remained >0)
-	{
-		if (option.bytes_remained == recv_length)
-		{
-			std::cout<<"recv_okay\n"<<std::endl;
-			PushRecvBuffToQueue(clientfd, &option.data[5], option.pro_length);
-			//clear temp
-			option.pro_length = 0;
-			option.count = 0;
-			option.bytes_remained = 0;
-			memset(option.data, 0, BUFLENGTH);//clear recvbuf[BUFLENGTH];
-		}
-		else if (option.bytes_remained > recv_length)
-		{
-			std::cout<<"need to stick the buff-2\n"<<std::endl;
-			option.bytes_remained -= recv_length;
-			option.count += recv_length;
-			//continue;//wait the 
-		}
-		else//bytes_remained < recv_length
-		{
-			if ((option.data[option.pro_length + PROTOCOL_PACKAGE_LENGTH_SIZE] == '}'))
-			{
-				std::cout<<"need  to dismantle the buff-2\n"<<std::endl;
-				PushRecvBuffToQueue(clientfd, &option.data[5], option.pro_length);
-
-				memcpy(&option.data[0], &option.data[option.pro_length + 5], (option.count + recv_length - option.pro_length - 5));
-				memset(&option.data[option.count + recv_length - option.pro_length - 5], 0x00, BUFLENGTH - (option.count + recv_length - option.pro_length - 5));
-
-				recv_length = option.count + recv_length - option.pro_length - 5;
-				option.bytes_remained = 0;
-				option.count = 0;
-				//goto Start;
-			}
-			else
-			{
-				std::cout<<"packet loss and wait to stick buff-3\n"<<std::endl;
-				memcpy(&option.data[0], &option.data[option.count], recv_length);
-				memset(&option.data[recv_length], 0x00, BUFLENGTH - (recv_length));
-				//recv_length = recv_length;
-				option.bytes_remained = 0;
-				option.count = 0;
-			}
-			goto Start;
-
-		}
-
-	}
-	else//bytes_remained < 0
-	{
-		option.pro_length = 0;
-		option.count = 0;
-		option.bytes_remained = 0;
-		memset(option.data, 0, BUFLENGTH);
-		SocketClearRecvBuffer(clientfd);
-		std::cout<<"Recv err data and clear temp!!!\n"<<std::endl;
-	}
-
-	return return_value;
-
-}
+//int JProtocol::StickDismantleProtocol(HSocket clientfd, char *ptr, int ptr_len, StickDismantleOptions_t &option)
+//{
+//	int return_value = 0;
+//	int32_t recv_length = ptr_len;
+//	std::string len_str;
+//	len_str.clear();
+//
+//	if (!ptr || ptr_len>BUFLENGTH) return -1;
+//	memcpy(&option.data[option.count], ptr, ptr_len);
+//
+//Start:
+//
+//	if ((option.data[0] == PROTOCOL_HEAD) && (recv_length >= 5) && (option.bytes_remained == 0))//protocol start
+//	{
+//		memcpy((void*)len_str.c_str(), &option.data[1], PROTOCOL_PACKAGE_LENGTH_SIZE);
+//		sscanf(len_str.c_str(), "%D", &option.pro_length);//string->int
+//
+//		option.bytes_remained = option.pro_length - (recv_length - 5);
+//
+//		if (option.bytes_remained == 0)
+//		{
+//			std::cout<<"recv_okay\n"<<std::endl;
+//			PushRecvBuffToQueue(clientfd, &option.data[5], option.pro_length);
+//			//clear temp
+//			option.pro_length = 0;
+//			option.count = 0;
+//			memset(option.data, 0, BUFLENGTH);//clear data;
+//		}
+//		else if (option.bytes_remained > 0)//need  to stick the buff
+//		{
+//			std::cout<<"need to stick the buff\n"<<std::endl;
+//			option.count += recv_length;
+//
+//		}
+//		else//recv_length >(pro_length+5) (bytes_remained < 0)//need  to dismantle the buff
+//		{
+//			std::cout<<"need  to dismantle the buff\n"<<std::endl;
+//			PushRecvBuffToQueue(clientfd, &option.data[5], option.pro_length);
+//
+//			memcpy(&option.data[0], &option.data[option.pro_length + 5], recv_length - 5 - option.pro_length);
+//			memset(&option.data[recv_length - option.pro_length - 5], 0x00, BUFLENGTH - (recv_length - option.pro_length - 5));
+//
+//
+//			recv_length = recv_length - 5 - option.pro_length;
+//			option.bytes_remained = 0;
+//			option.count = 0;
+//			goto Start;
+//
+//		}
+//
+//	}
+//	else if (option.bytes_remained >0)
+//	{
+//		if (option.bytes_remained == recv_length)
+//		{
+//			std::cout<<"recv_okay\n"<<std::endl;
+//			PushRecvBuffToQueue(clientfd, &option.data[5], option.pro_length);
+//			//clear temp
+//			option.pro_length = 0;
+//			option.count = 0;
+//			option.bytes_remained = 0;
+//			memset(option.data, 0, BUFLENGTH);//clear recvbuf[BUFLENGTH];
+//		}
+//		else if (option.bytes_remained > recv_length)
+//		{
+//			std::cout<<"need to stick the buff-2\n"<<std::endl;
+//			option.bytes_remained -= recv_length;
+//			option.count += recv_length;
+//			//continue;//wait the 
+//		}
+//		else//bytes_remained < recv_length
+//		{
+//			if ((option.data[option.pro_length + PROTOCOL_PACKAGE_LENGTH_SIZE] == '}'))
+//			{
+//				std::cout<<"need  to dismantle the buff-2\n"<<std::endl;
+//				PushRecvBuffToQueue(clientfd, &option.data[5], option.pro_length);
+//
+//				memcpy(&option.data[0], &option.data[option.pro_length + 5], (option.count + recv_length - option.pro_length - 5));
+//				memset(&option.data[option.count + recv_length - option.pro_length - 5], 0x00, BUFLENGTH - (option.count + recv_length - option.pro_length - 5));
+//
+//				recv_length = option.count + recv_length - option.pro_length - 5;
+//				option.bytes_remained = 0;
+//				option.count = 0;
+//				//goto Start;
+//			}
+//			else
+//			{
+//				std::cout<<"packet loss and wait to stick buff-3\n"<<std::endl;
+//				memcpy(&option.data[0], &option.data[option.count], recv_length);
+//				memset(&option.data[recv_length], 0x00, BUFLENGTH - (recv_length));
+//				//recv_length = recv_length;
+//				option.bytes_remained = 0;
+//				option.count = 0;
+//			}
+//			goto Start;
+//
+//		}
+//
+//	}
+//	else//bytes_remained < 0
+//	{
+//		option.pro_length = 0;
+//		option.count = 0;
+//		option.bytes_remained = 0;
+//		memset(option.data, 0, BUFLENGTH);
+//		SocketClearRecvBuffer(clientfd);
+//		std::cout<<"Recv err data and clear temp!!!\n"<<std::endl;
+//	}
+//
+//	return return_value;
+//
+//}
 bool JProtocol::CloseSocket(HSocket sockfd)
 {
 	closesocket(sockfd);

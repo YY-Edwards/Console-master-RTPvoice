@@ -15,18 +15,19 @@
 #include "json.h"
 #include "fifoqueue.h"
 #include "socketwrap.h"
+#include "clientobj.h"
 #include <time.h>
 
-#pragma pack(push, 1)
-typedef struct{
-
-	 int32_t	bytes_remained;
-	 uint32_t	count;
-	 int32_t	pro_length;
-	 char		data[BUFLENGTH];
-
-}StickDismantleOptions_t;
-#pragma pack(pop)
+//#pragma pack(push, 1)
+//typedef struct{
+//
+//	 int32_t	bytes_remained;
+//	 uint32_t	count;
+//	 int32_t	pro_length;
+//	 char		data[BUFLENGTH];
+//
+//}StickDismantleOptions_t;
+//#pragma pack(pop)
 
 
 class JProtocol
@@ -149,6 +150,8 @@ private:
 	ILock *stickdismantle_locker;
 	ILock *clientmap_locker;
 
+	
+	ClientObj *clientobjarray[MAX_LISTENING_COUNT];
 	//线程接口类指针
 	MyCreateThread *listen_thread_p[MAX_LISTENING_COUNT];
 
@@ -162,6 +165,7 @@ private:
 
 	bool set_thread_exit_flag;
 	int listen_numb;//监听计数值
+	int client_numb;//监听计数值
 
 	/*
 	设置线程退出标志
@@ -187,7 +191,7 @@ private:
 	/*
 	协议数据粘包/拆包函数
 	*/
-	int StickDismantleProtocol(HSocket fd, char *buff, int len, StickDismantleOptions_t &ptr);
+	//int StickDismantleProtocol(HSocket fd, char *buff, int len, StickDismantleOptions_t &ptr);
 	
 
 

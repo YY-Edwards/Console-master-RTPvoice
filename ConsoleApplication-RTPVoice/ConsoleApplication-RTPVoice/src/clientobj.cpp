@@ -21,6 +21,10 @@ ClientObj::ClientObj(HSocket socketfd, void(*callBackFunc)(int, ResponeData))
 
 void ClientObj::InitProtocolData()
 {
+	
+	memset(recvbuff, 0x00, BUFLENGTH);
+	memset(&temp_option, 0x00, sizeof(StickDismantleOptions_t)); 
+	
 	set_thread_exit_flag = false;
 
 	socketoption.lingertimeout = TIMEOUT_VALUE;
@@ -67,7 +71,10 @@ void ClientObj::InitProtocolData()
 
 ClientObj::~ClientObj()
 {
-	SocketClose(clientfd);
+	if (clientfd != INVALID_SOCKET)
+	{
+		SocketClose(clientfd);
+	}
 
 	SetThreadExitFlag();//通知线程退出
 
@@ -278,14 +285,14 @@ int ClientObj::ProcessClientReqThreadFunc()
 {
 	
 	int return_value = 0;
-	char recvbuff[BUFLENGTH];
+	/*char recvbuff[BUFLENGTH];
 	memset(recvbuff, 0x00, BUFLENGTH);
 	transresult_t rt;
 	StickDismantleOptions_t temp_option;
-	memset(&temp_option, 0x00, sizeof(StickDismantleOptions_t));
+	memset(&temp_option, 0x00, sizeof(StickDismantleOptions_t));*/
 
-	std::string len_str;
-	len_str.clear();
+	/*std::string len_str;
+	len_str.clear();*/
 
 	//设置clientfd超时
 	SocketTimeOut(clientfd, socketoption.recvtimeout, socketoption.sendtimeout, socketoption.lingertimeout);
@@ -425,12 +432,19 @@ Start:
 	}
 	else//bytes_remained < 0
 	{
-		option.pro_length = 0;
-		option.count = 0;
-		option.bytes_remained = 0;
-		memset(option.data, 0, BUFLENGTH);
-		SocketClearRecvBuffer(clientfd);
-		std::cout << "Recv err data and clear temp!!!\n" << std::endl;
+		if (recv_length< 5)
+		{
+			option.count += recv_length;
+		}
+		else
+		{
+			option.pro_length = 0;
+			option.count = 0;
+			option.bytes_remained = 0;
+			memset(option.data, 0, BUFLENGTH);
+			SocketClearRecvBuffer(clientfd);
+			std::cout << "Recv err data and clear temp!!!\n" << std::endl;
+		}
 	}
 
 	return return_value;

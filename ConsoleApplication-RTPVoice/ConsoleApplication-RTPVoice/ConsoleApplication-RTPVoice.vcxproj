@@ -53,7 +53,8 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_LIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>F:\VS2013\C++\RTP_MatserVoice\Master-RTP-Voice\ConsoleApplication-RTPVoice\ConsoleApplication-RTPVoice\src;F:\VS2013\C++\RTP_MatserVoice\Master-RTP-Voice\ConsoleApplication-RTPVoice\ConsoleApplication-RTPVoice;F:\VS2013\C++\RTP_MatserVoice\Master-RTP-Voice\ConsoleApplication-RTPVoice\ConsoleApplication-RTPVoice\lib\jrtplib\include\jrtplib3;F:\VS2013\C++\RTP_MatserVoice\Master-RTP-Voice\ConsoleApplication-RTPVoice\ConsoleApplication-RTPVoice\lib\JsonWrap\include\json;F:\VS2013\C++\RTP_MatserVoice\Master-RTP-Voice\ConsoleApplication-RTPVoice\ConsoleApplication-RTPVoice\src\MyProtocol;F:\VS2013\C++\RTP_MatserVoice\Master-RTP-Voice\ConsoleApplication-RTPVoice\ConsoleApplication-RTPVoice\src\MyRTP;F:\VS2013\C++\RTP_MatserVoice\Master-RTP-Voice\ConsoleApplication-RTPVoice\ConsoleApplication-RTPVoice\src\SocketWrap;F:\VS2013\C++\RTP_MatserVoice\Master-RTP-Voice\ConsoleApplication-RTPVoice\ConsoleApplication-RTPVoice\src\SynInterface;F:\VS2013\C++\RTP_MatserVoice\Master-RTP-Voice\ConsoleApplication-RTPVoice\ConsoleApplication-RTPVoice\src\FifoQueue;F:\VS2013\C++\RTP_MatserVoice\Master-RTP-Voice\ConsoleApplication-RTPVoice\ConsoleApplication-RTPVoice\src\Common;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <StructMemberAlignment>1Byte</StructMemberAlignment>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
