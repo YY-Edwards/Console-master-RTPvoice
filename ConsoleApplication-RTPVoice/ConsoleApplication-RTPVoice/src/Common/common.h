@@ -71,6 +71,32 @@ typedef int HSocket;
 
 
 #pragma pack(1)
+
+
+typedef struct SocketParams_t{
+
+	HSocket			socket_fd;
+	sockaddr_in		remote_addr;
+
+	bool operator<(SocketParams_t const&_A) const
+	{
+		//这个函数指定排序策略，按socket_fd排序，如果socket_fd相等的话，按remote_addr.sin_addr排序
+		if (socket_fd < _A.socket_fd)return true;
+		if (socket_fd == _A.socket_fd)
+		{
+			if (remote_addr.sin_port < _A.remote_addr.sin_port)
+				return true;
+			else
+				return false;
+		}
+		return false;
+
+
+	}
+
+}SocketParams_t;
+
+
 struct ResponeData
 {
 	HSocket socket_fd;
@@ -91,6 +117,12 @@ struct ResponeData
 
 };
 
+typedef struct{
+
+	void(*RequestCallBackFunc)(int, ResponeData);
+	void(*ExitNotifyCallBackFunc)(SocketParams_t);
+
+}MultiCallBackFuncs_t;
 
 struct ResponeRTPData
 {

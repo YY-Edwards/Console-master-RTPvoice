@@ -102,31 +102,43 @@ private:
 	HSocket serversoc;
 	struct sockaddr_in my_addr; /* loacl */
 	//socket初始化变量结构体
-	socketoption_t socketoption;
+	//socketoption_t socketoption;
 	/*
 	声明socket接口类
 	*/
 	CSockWrap *mytcp_server;
 
+	MultiCallBackFuncs_t multicallbackfuncs;
 
 	//回调接口
-	void(*RequestCallBackFunc)(int, ResponeData);//请求类回调
+	//void(*RequestCallBackFunc)(int, ResponeData);//请求类回调
 	//void(*NotifyCallBackFunc)(int, ResponeData);//通知类回调
-	void onData(void(*func)(int, ResponeData), int command, ResponeData data);
+	//void onData(void(*func)(int, ResponeData), int command, ResponeData data);
 
-	int ProcessClient(HSocket clientfd);
+	MyCreateThread *listen_thread_p[MAX_LISTENING_COUNT];
+	MyCreateThread *recovery_thread_p;
+
+	//int ProcessClient(HSocket clientfd);
 	void CreateListenThread();
-	void CreatProtocolParseThread();
-	//void CreatDataProcessThread();
-
 	static int ListenThread(void* p);
 	int ListenThreadFunc();
-	static int ProtocolParseThread(void *p);
-	int ProtocolParseThreadFunc();
+
+	void CreateRecoveryClientObjThread();
+	static int RecoveryClientObjThread(void* p);
+	int RecoveryClientObjThreadFunc();
+
+
+	static JProtocol * pThis;
+	static void NotifyRecoveryClienObj(SocketParams_t clientsocket);
+	void NotifyDeleleClienObjFunc(SocketParams_t clientsocket);
+	FifoQueue clientqueue;
+	
+	//static int ProtocolParseThread(void *p);
+	//int ProtocolParseThreadFunc();
 	//static int  DataProcessThread(void *p);
 	//void DataProcessThreadFunc();
 
-	void DataProcessFunc();
+	//void DataProcessFunc();
 	//void WriteJsonData();
 	
 	/*
@@ -146,22 +158,22 @@ private:
 	*/
 	void InitProtocolData();
 
-	ILock *ondata_locker;
-	ILock *stickdismantle_locker;
+	//ILock *ondata_locker;
+	//ILock *stickdismantle_locker;
 	ILock *clientmap_locker;
 
-	
-	ClientObj *clientobjarray[MAX_LISTENING_COUNT];
+	//ClientObj *clientobj_p;
+	//ClientObj *clientobjarray[MAX_LISTENING_COUNT];
 	//线程接口类指针
-	MyCreateThread *listen_thread_p[MAX_LISTENING_COUNT];
 
-	MyCreateThread *parse_thread_p;
+	//MyCreateThread *parse_thread_p;
 
-	FifoQueue jqueue;//JSON data queue
+	//FifoQueue jqueue;//JSON data queue
 
-	PROTOCOL_Ctrlr thePROTOCOL_Ctrlr;//协议结构
-	std::map <std::string, int>  statemap;//状态机
-	std::map <HSocket, struct sockaddr_in>  clientmap;//save client-info
+	//PROTOCOL_Ctrlr thePROTOCOL_Ctrlr;//协议结构
+	//std::map <std::string, int>  statemap;//状态机
+	//std::map <HSocket, struct sockaddr_in>  clientmap;//save client-info
+	std::map <SocketParams_t , ClientObj *>  clientmap;//save client-info
 
 	bool set_thread_exit_flag;
 	int listen_numb;//监听计数值
@@ -181,7 +193,7 @@ private:
 	/*
 	打包协议数据
 	*/
-	int PushRecvBuffToQueue(HSocket clientfd, char *buff, int buff_len);
+	//int PushRecvBuffToQueue(HSocket clientfd, char *buff, int buff_len);
 	
 	/*
 	物理层发送协议数据包

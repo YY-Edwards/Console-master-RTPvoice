@@ -2,15 +2,17 @@
 #include "clientobj.h"
 
 
-ClientObj::ClientObj(HSocket socketfd, void(*callBackFunc)(int, ResponeData))
+ClientObj::ClientObj(SocketParams_t socketparam, MultiCallBackFuncs_t callbacks)
 {
 	InitProtocolData();
 
 	RequestCallBackFunc = NULL;
 
-	RequestCallBackFunc = callBackFunc;//回调设置
+	RequestCallBackFunc = callbacks.RequestCallBackFunc;//回调设置
 
-	clientfd = socketfd;
+	NotifyDeleteCallBackFunc = callbacks.ExitNotifyCallBackFunc;
+
+	clientsocket = socketparam;
 
 	CreatProtocolParseThread();
 
@@ -32,6 +34,7 @@ void ClientObj::InitProtocolData()
 	socketoption.sendtimeout = TIMEOUT_VALUE;
 	
 	ondata_locker = new CriSection();
+	deobj_locker = new CriSection();
 	process_client_thread_p = NULL;
 	parse_thread_p = NULL;
 	//inset states
@@ -71,9 +74,9 @@ void ClientObj::InitProtocolData()
 
 ClientObj::~ClientObj()
 {
-	if (clientfd != INVALID_SOCKET)
+	if (clientsocket.socket_fd != INVALID_SOCKET)
 	{
-		SocketClose(clientfd);
+		SocketClose(clientsocket.socket_fd);
 	}
 
 	SetThreadExitFlag();//通知线程退出
@@ -99,6 +102,11 @@ ClientObj::~ClientObj()
 	{
 		delete ondata_locker;
 		ondata_locker = NULL;
+	}
+	if (deobj_locker != NULL)
+	{
+		delete deobj_locker;
+		deobj_locker = NULL;
 	}
 
 	std::cout << "Destory: ClientObj \n" << std::endl;
@@ -203,7 +211,7 @@ int ClientObj::ProtocolParseThreadFunc()
 	}
 
 	//TRACE((" exit ProtocolParseThreadFunc : 0x%x\n"), GetCurrentThreadId());
-	std::cout << " exit ProtocolParseThreadFunc : 0x" << hex << GetCurrentThreadId()<< std::endl;
+	std::cout << "exit ProtocolParseThreadFunc : 0x" << hex << GetCurrentThreadId()<< std::endl;
 	return return_value;
 }
 void ClientObj::DataProcessFunc()
@@ -260,12 +268,27 @@ void ClientObj::onData(void(*func)(int, ResponeData), int command, ResponeData d
 	}
 	catch (double)
 	{
-		std::cout << "func error...\n" << std::endl;
+		std::cout << "onData func error...\n" << std::endl;
 
 	}
 	ondata_locker->Unlock();
 
 }
+void ClientObj::deOBJ(void(*func)(SocketParams_t), SocketParams_t clientsocket)
+{
+	deobj_locker->Lock();
+	try
+	{
+		func(clientsocket);
+	}
+	catch (double)
+	{
+		std::cout << "deOBJ func error...\n" << std::endl;
+
+	}
+	deobj_locker->Unlock();
+}
+
 
 int ClientObj::ProcessClientReqThread(void *p)
 {
@@ -275,9 +298,9 @@ int ClientObj::ProcessClientReqThread(void *p)
 	{
 		return_value = arg->ProcessClientReqThreadFunc();
 	}
-	std::cout << "Close socket:" << arg->clientfd<<" and exit ProcessClientReqThreadFunc : 0x" << hex << GetCurrentThreadId() << std::endl;
+	std::cout << "Notifying the upper App and exit ProcessClientReqThreadFunc : 0x" << hex << GetCurrentThreadId() << std::endl;
 
-	SocketClose(arg->clientfd);
+	arg->deOBJ(arg->NotifyDeleteCallBackFunc, arg->clientsocket);//通知上层应用删除clientObj对象
 
 	return return_value;
 }
@@ -285,21 +308,13 @@ int ClientObj::ProcessClientReqThreadFunc()
 {
 	
 	int return_value = 0;
-	/*char recvbuff[BUFLENGTH];
-	memset(recvbuff, 0x00, BUFLENGTH);
-	transresult_t rt;
-	StickDismantleOptions_t temp_option;
-	memset(&temp_option, 0x00, sizeof(StickDismantleOptions_t));*/
-
-	/*std::string len_str;
-	len_str.clear();*/
 
 	//设置clientfd超时
-	SocketTimeOut(clientfd, socketoption.recvtimeout, socketoption.sendtimeout, socketoption.lingertimeout);
+	SocketTimeOut(clientsocket.socket_fd, socketoption.recvtimeout, socketoption.sendtimeout, socketoption.lingertimeout);
 	std::cout << "Connected\n" << std::endl;
 	while (!set_thread_exit_flag)
 	{
-		SocketRecv(clientfd, &recvbuff[0], BUFLENGTH, rt);
+		SocketRecv(clientsocket.socket_fd, &recvbuff[0], 512, rt);
 		if (rt.nbytes > 0)
 		{
 			if ((recvbuff[0] == 'Q') && rt.nbytes == 1)//测试用
@@ -308,7 +323,7 @@ int ClientObj::ProcessClientReqThreadFunc()
 				break;
 			}
 
-			return_value = StickDismantleProtocol(clientfd, &recvbuff[0], rt.nbytes, temp_option);
+			return_value = StickDismantleProtocol(clientsocket.socket_fd, &recvbuff[0], rt.nbytes, temp_option);
 			memset(&recvbuff[0], 0, BUFLENGTH);//clear recvbuf[BUFLENGTH];
 
 		}

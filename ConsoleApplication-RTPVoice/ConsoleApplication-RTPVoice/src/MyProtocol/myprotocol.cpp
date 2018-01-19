@@ -9,6 +9,8 @@
 #include "stdafx.h"
 #include "myprotocol.h"
 
+JProtocol *JProtocol::pThis = NULL;
+
 JProtocol::JProtocol()
 {
 	 InitProtocolData();
@@ -19,12 +21,18 @@ JProtocol::~JProtocol()
 	CloseMater();
 	SetThreadExitFlag();//通知线程退出
 
-	if (parse_thread_p != NULL)
+	if (recovery_thread_p != NULL)
+	{
+		delete recovery_thread_p;
+		recovery_thread_p = NULL;
+	}
+
+	/*if (parse_thread_p != NULL)
 	{
 		delete parse_thread_p;
 		parse_thread_p = NULL;
 
-	}
+	}*/
 	for (int i = 0; i < MAX_LISTENING_COUNT; i++)
 	{
 		if (listen_thread_p[i] != NULL)
@@ -33,31 +41,43 @@ JProtocol::~JProtocol()
 			listen_thread_p[i] = NULL;
 		}
 
-		if (clientobjarray[i] != NULL)
+		/*if (clientobjarray[i] != NULL)
 		{
 			delete clientobjarray[i];
 			clientobjarray[i] = NULL;
-		}
+		}*/
 	}
 
-	jqueue.ClearQueue();
-	statemap.clear();
-	clientmap.clear();
+	//if (clientobj_p != NULL)
+	//{
+	//	delete clientobj_p;
+	//	clientobj_p = NULL;
+	//}
 
-	if (ondata_locker != NULL)
+	/*jqueue.ClearQueue();
+	statemap.clear();*/
+	std::map<SocketParams_t, ClientObj *> ::iterator it;
+	while (clientmap.size()>0)
 	{
-		delete ondata_locker;
-		ondata_locker = NULL;
+		it = clientmap.begin();
+		if (it->second != NULL)
+		{
+			delete it->second;
+			it->second = NULL;
+		}
+		clientmap.erase(it);
 	}
+
+
+	//if (ondata_locker != NULL)
+	//{
+	//	delete ondata_locker;
+	//	ondata_locker = NULL;
+	//}
 	if (clientmap_locker != NULL)
 	{
 		delete clientmap_locker;
 		clientmap_locker = NULL;
-	}
-	if (stickdismantle_locker != NULL)
-	{
-		delete stickdismantle_locker;
-		stickdismantle_locker = NULL;
 	}
 
 	FreeSocketEnvironment();
@@ -67,13 +87,15 @@ JProtocol::~JProtocol()
 
 void JProtocol::InitProtocolData()
 {
+	pThis = this;
+
 	InitializeSocketEnvironment();
 
 	mytcp_server = NULL;
-	socketoption.recvtimeout = TIMEOUT_VALUE;//10s
-	socketoption.sendtimeout = TIMEOUT_VALUE;//10s
-	socketoption.lingertimeout = TIMEOUT_VALUE;
-	socketoption.block = TRUE;
+	//socketoption.recvtimeout = TIMEOUT_VALUE;//10s
+	//socketoption.sendtimeout = TIMEOUT_VALUE;//10s
+	//socketoption.lingertimeout = TIMEOUT_VALUE;
+	//socketoption.block = TRUE;
 
 	startfunc_is_finished = false;
 	set_thread_exit_flag = false;
@@ -81,49 +103,51 @@ void JProtocol::InitProtocolData()
 	socketopen = false;
 	serversoc = INVALID_SOCKET;
 	listen_numb = 0;
+	recovery_thread_p = NULL;
 	memset(listen_thread_p, 0, MAX_LISTENING_COUNT*sizeof(MyCreateThread *));//注意大小问题
-	memset(clientobjarray, 0, MAX_LISTENING_COUNT*sizeof(ClientObj *));//注意大小问题
+	//memset(clientobjarray, 0, MAX_LISTENING_COUNT*sizeof(ClientObj *));//注意大小问题
+	//clientobj_p = NULL;
+	//parse_thread_p = NULL;
 
-	parse_thread_p = NULL;
-
-	RequestCallBackFunc = NULL;
-
-	ondata_locker = new CriSection();
+	multicallbackfuncs.RequestCallBackFunc = NULL;
+	multicallbackfuncs.ExitNotifyCallBackFunc = NotifyRecoveryClienObj;//通知，回调接口
 	clientmap_locker = new CriSection();
-	stickdismantle_locker = new CriSection();
 
-	//inset states
-	statemap.insert(std::pair<string, int>("Connect", CONNECT));
-	statemap.insert(std::pair<string, int>("Listening", LISTENING));
-	statemap.insert(std::pair<string, int>("Query", QUERY));
-	statemap.insert(std::pair<string, int>("CallRequest", CALLREQUEST));
-	statemap.insert(std::pair<string, int>("CallRelease", CALLRELEASE));
-	statemap.insert(std::pair<string, int>("CallStart", CALLSTART));
-	statemap.insert(std::pair<string, int>("CallEND", CALLEND));
+	//ondata_locker = new CriSection();
+	//stickdismantle_locker = new CriSection();
 
-	//init default protocol data
-	thePROTOCOL_Ctrlr.clientfd = INVALID_SOCKET;
-	thePROTOCOL_Ctrlr.MASTER_State = CONNECT;
-	thePROTOCOL_Ctrlr.PROTOCOL_Fixed_Header.identifier = "";
-	thePROTOCOL_Ctrlr.PROTOCOL_Fixed_Header.type = "Request";
-	thePROTOCOL_Ctrlr.PROTOCOL_Fixed_Header.name = "Connect";
-	thePROTOCOL_Ctrlr.PROTOCOL_params.key = "";
-	thePROTOCOL_Ctrlr.PROTOCOL_params.status = "fail";
-	thePROTOCOL_Ctrlr.PROTOCOL_params.reason = "";
-	thePROTOCOL_Ctrlr.PROTOCOL_params.Listening_Channels_Group.channel1_group_id = 0;
-	thePROTOCOL_Ctrlr.PROTOCOL_params.Listening_Channels_Group.channel2_group_id = 0;
+	////inset states
+	//statemap.insert(std::pair<string, int>("Connect", CONNECT));
+	//statemap.insert(std::pair<string, int>("Listening", LISTENING));
+	//statemap.insert(std::pair<string, int>("Query", QUERY));
+	//statemap.insert(std::pair<string, int>("CallRequest", CALLREQUEST));
+	//statemap.insert(std::pair<string, int>("CallRelease", CALLRELEASE));
+	//statemap.insert(std::pair<string, int>("CallStart", CALLSTART));
+	//statemap.insert(std::pair<string, int>("CallEND", CALLEND));
+
+	////init default protocol data
+	//thePROTOCOL_Ctrlr.clientfd = INVALID_SOCKET;
+	//thePROTOCOL_Ctrlr.MASTER_State = CONNECT;
+	//thePROTOCOL_Ctrlr.PROTOCOL_Fixed_Header.identifier = "";
+	//thePROTOCOL_Ctrlr.PROTOCOL_Fixed_Header.type = "Request";
+	//thePROTOCOL_Ctrlr.PROTOCOL_Fixed_Header.name = "Connect";
+	//thePROTOCOL_Ctrlr.PROTOCOL_params.key = "";
+	//thePROTOCOL_Ctrlr.PROTOCOL_params.status = "fail";
+	//thePROTOCOL_Ctrlr.PROTOCOL_params.reason = "";
+	//thePROTOCOL_Ctrlr.PROTOCOL_params.Listening_Channels_Group.channel1_group_id = 0;
+	//thePROTOCOL_Ctrlr.PROTOCOL_params.Listening_Channels_Group.channel2_group_id = 0;
 
 
-	thePROTOCOL_Ctrlr.PROTOCOL_params.Listening_Params_Channels_Params.channel1.reason = "timeout";
-	thePROTOCOL_Ctrlr.PROTOCOL_params.Listening_Params_Channels_Params.channel1.status = "fail";
-	thePROTOCOL_Ctrlr.PROTOCOL_params.Listening_Params_Channels_Params.channel1.listening_group_id = 0;
-	thePROTOCOL_Ctrlr.PROTOCOL_params.Listening_Params_Channels_Params.channel2.reason = "timeout";
-	thePROTOCOL_Ctrlr.PROTOCOL_params.Listening_Params_Channels_Params.channel2.status = "fail";
-	thePROTOCOL_Ctrlr.PROTOCOL_params.Listening_Params_Channels_Params.channel2.listening_group_id = 0;
+	//thePROTOCOL_Ctrlr.PROTOCOL_params.Listening_Params_Channels_Params.channel1.reason = "timeout";
+	//thePROTOCOL_Ctrlr.PROTOCOL_params.Listening_Params_Channels_Params.channel1.status = "fail";
+	//thePROTOCOL_Ctrlr.PROTOCOL_params.Listening_Params_Channels_Params.channel1.listening_group_id = 0;
+	//thePROTOCOL_Ctrlr.PROTOCOL_params.Listening_Params_Channels_Params.channel2.reason = "timeout";
+	//thePROTOCOL_Ctrlr.PROTOCOL_params.Listening_Params_Channels_Params.channel2.status = "fail";
+	//thePROTOCOL_Ctrlr.PROTOCOL_params.Listening_Params_Channels_Params.channel2.listening_group_id = 0;
 
-	thePROTOCOL_Ctrlr.PROTOCOL_params.src = 9;
-	thePROTOCOL_Ctrlr.PROTOCOL_params.dst = 65536;
-	thePROTOCOL_Ctrlr.PROTOCOL_params.channel = "";
+	//thePROTOCOL_Ctrlr.PROTOCOL_params.src = 9;
+	//thePROTOCOL_Ctrlr.PROTOCOL_params.dst = 65536;
+	//thePROTOCOL_Ctrlr.PROTOCOL_params.channel = "";
 
 }
 void JProtocol::CloseMater()
@@ -140,25 +164,26 @@ void JProtocol::CloseMater()
 }
 void JProtocol::SetCallBackFunc(void(*callBackFunc)(int, ResponeData))
 {
-	RequestCallBackFunc = callBackFunc;//回调设置
+	//RequestCallBackFunc = callBackFunc;//回调设置
+	multicallbackfuncs.RequestCallBackFunc = callBackFunc;
 }
-void JProtocol::onData(void(*func)(int, ResponeData), int command, ResponeData data)
-{
-	//WaitForSingleObject(ondata_locker, INFINITE);
-	ondata_locker->Lock();
-	try
-	{
-		func(command, data);
-	}
-	catch (double)
-	{
-		std::cout<<"func error...\n"<<std::endl;
-
-	}
-	ondata_locker->Unlock();
-	//ReleaseMutex(ondata_locker);
-
-}
+//void JProtocol::onData(void(*func)(int, ResponeData), int command, ResponeData data)
+//{
+//	//WaitForSingleObject(ondata_locker, INFINITE);
+//	ondata_locker->Lock();
+//	try
+//	{
+//		func(command, data);
+//	}
+//	catch (double)
+//	{
+//		std::cout<<"func error...\n"<<std::endl;
+//
+//	}
+//	ondata_locker->Unlock();
+//	//ReleaseMutex(ondata_locker);
+//
+//}
 void JProtocol::Start()
 {
 	bool status = false;
@@ -235,12 +260,20 @@ bool JProtocol::InitSocket()
 	*/
 
 	//CreatDataProcessThread();
-	CreatProtocolParseThread();
+	//CreatProtocolParseThread();
 	CreateListenThread();
+	CreateRecoveryClientObjThread();
+	//if (recovery_thread_p == NULL)
+	//	CreateRecoveryClientThread();
 
 	/*socketopen = true;*/
 
 	return true;
+
+}
+void JProtocol::CreateRecoveryClientObjThread()
+{
+	recovery_thread_p = new MyCreateThread(RecoveryClientObjThread, this);
 
 }
 void JProtocol::CreateListenThread()
@@ -250,145 +283,6 @@ void JProtocol::CreateListenThread()
 		listen_thread_p[listen_numb++] = new MyCreateThread(ListenThread, this);
 	}
 
-}
-void JProtocol::CreatProtocolParseThread()
-{
-	parse_thread_p = new MyCreateThread(ProtocolParseThread, this);
-
-}
-
-void JProtocol::DataProcessFunc()
-{
-
-	switch (statemap.find(thePROTOCOL_Ctrlr.PROTOCOL_Fixed_Header.name)->second)
-	{
-	case CONNECT:
-			std::cout<<"the ThirdParty Request Connect\n"<<std::endl;
-		break;
-
-	case LISTENING:
-			std::cout<<"the ThirdParty Request Listening\n"<<std::endl;
-		break;
-
-	case QUERY:
-			std::cout<<"the ThirdParty Request Query\n"<<std::endl;
-		break;
-
-	case CALLREQUEST:
-			std::cout<<"the ThirdParty Request Call Start\n"<<std::endl;
-		break;
-	case CALLRELEASE:
-			std::cout<<"the ThirdParty Request Call Release\n"<<std::endl;
-		break;
-	case CALLSTART:
-	case CALLEND:
-			std::cout<<"no support cmd\n"<<std::endl;
-		break;
-	default:
-		break;
-	}
-
-	if (RequestCallBackFunc != NULL)
-	{
-		ResponeData r = { thePROTOCOL_Ctrlr.clientfd, thePROTOCOL_Ctrlr.PROTOCOL_Fixed_Header.identifier, thePROTOCOL_Ctrlr.PROTOCOL_params.key,
-		thePROTOCOL_Ctrlr.PROTOCOL_params.channel, thePROTOCOL_Ctrlr.PROTOCOL_params.Listening_Channels_Group.channel1_group_id,
-		thePROTOCOL_Ctrlr.PROTOCOL_params.Listening_Channels_Group.channel2_group_id,
-		thePROTOCOL_Ctrlr.PROTOCOL_params.src, thePROTOCOL_Ctrlr.PROTOCOL_params.dst,
-		"", "" };
-
-		onData(RequestCallBackFunc, statemap.find(thePROTOCOL_Ctrlr.PROTOCOL_Fixed_Header.name)->second, r);//callback (*func)
-	}
-
-
-}
-int JProtocol::ProtocolParseThread(void *p)
-{
-	JProtocol *arg = (JProtocol*)p;
-	int return_value = 0;
-	if (arg != NULL)
-	{
-		return_value = arg->ProtocolParseThreadFunc();
-	}
-	return return_value;
-}
-int JProtocol::ProtocolParseThreadFunc()
-{
-	Json::Value val;
-	Json::Reader reader;
-	char queue_data[1024];
-	char json_data[512];
-	int len=0;
-	int return_value = SYN_ABANDONED;
-	HSocket client_fd = INVALID_SOCKET;
-	memset(queue_data, 0x00, 1024);
-	memset(json_data, 0x00, 512);
-
-	while ((return_value = jqueue.TakeFromQueue(queue_data, (int&)len, 200)) >= 0)//200ms
-	{
-		if (set_thread_exit_flag)break;
-		if (SYN_OBJECT_o == return_value)
-		{
-			sscanf(queue_data, "%4D", &client_fd);
-			memcpy(json_data, &queue_data[sizeof(HSocket)], sizeof(json_data));
-			if (reader.parse(json_data, val))//Parse JSON buff
-			{
-				thePROTOCOL_Ctrlr.clientfd = client_fd;
-
-				thePROTOCOL_Ctrlr.PROTOCOL_Fixed_Header.identifier = val["identifier"].asString();
-				thePROTOCOL_Ctrlr.PROTOCOL_Fixed_Header.type = val["type"].asString();
-				thePROTOCOL_Ctrlr.PROTOCOL_Fixed_Header.name = val["name"].asString();
-
-				if (thePROTOCOL_Ctrlr.PROTOCOL_Fixed_Header.name == "Connect")
-					thePROTOCOL_Ctrlr.PROTOCOL_params.key = val["key"].asString();
-				else if (thePROTOCOL_Ctrlr.PROTOCOL_Fixed_Header.name == "Listening")
-				{
-					thePROTOCOL_Ctrlr.PROTOCOL_params.Listening_Channels_Group.channel1_group_id = val["param"]["listening"]["channel1"].asInt();
-					thePROTOCOL_Ctrlr.PROTOCOL_params.Listening_Params_Channels_Params.channel1.listening_group_id = thePROTOCOL_Ctrlr.PROTOCOL_params.Listening_Channels_Group.channel1_group_id;
-					
-					thePROTOCOL_Ctrlr.PROTOCOL_params.Listening_Channels_Group.channel2_group_id = val["param"]["listening"]["channel2"].asInt();
-					thePROTOCOL_Ctrlr.PROTOCOL_params.Listening_Params_Channels_Params.channel2.listening_group_id = thePROTOCOL_Ctrlr.PROTOCOL_params.Listening_Channels_Group.channel2_group_id;
-
-				}
-				else if (thePROTOCOL_Ctrlr.PROTOCOL_Fixed_Header.name == "Query")
-				{
-					//no param data
-				}
-				else if ((thePROTOCOL_Ctrlr.PROTOCOL_Fixed_Header.name == "CallRequest") || (thePROTOCOL_Ctrlr.PROTOCOL_Fixed_Header.name == "CallRelease")
-					|| (thePROTOCOL_Ctrlr.PROTOCOL_Fixed_Header.name == "CallStart") || (thePROTOCOL_Ctrlr.PROTOCOL_Fixed_Header.name == "CallEnd"))
-				{
-					thePROTOCOL_Ctrlr.PROTOCOL_params.src = val["param"]["src"].asInt();
-					thePROTOCOL_Ctrlr.PROTOCOL_params.dst = val["param"]["dst"].asInt();
-					thePROTOCOL_Ctrlr.PROTOCOL_params.channel = val["param"]["channel"].asString();
-	
-				}
-				else
-				{
-					//other data
-
-				}
-
-				if (thePROTOCOL_Ctrlr.PROTOCOL_Fixed_Header.type == "Request")
-					DataProcessFunc();//process thePROTOCOL_Ctrlr data
-			}
-			else
-			{
-				std::cout<<"reader.parse err!!!\n"<<std::endl;
-			}
-			val.clear();
-			client_fd = INVALID_SOCKET;
-			memset(queue_data, 0x00, 1024);
-			memset(json_data, 0x00, 512);
-		}
-		else//timeout
-		{
-			//Sleep(200);//200ms
-		}
-
-	}
-
-	//TRACE((" exit ProtocolParseThreadFunc : 0x%x\n"), GetCurrentThreadId());
-	std::cout << " exit ProtocolParseThreadFunc : 0x" << hex << GetCurrentThreadId() << std::endl;
-	return return_value;
 }
 int JProtocol::ListenThread(void* p)
 {
@@ -403,112 +297,176 @@ int JProtocol::ListenThread(void* p)
 int JProtocol::ListenThreadFunc()
 {
 	int return_value = 0;
-	HSocket currentclientsoc = INVALID_SOCKET;
-	struct sockaddr_in remote_addr; //client_address
-	
+	//HSocket currentclientsoc = INVALID_SOCKET;
+	//struct sockaddr_in remote_addr; //client_address
+	SocketParams_t socketparam;
+	socketparam.socket_fd = INVALID_SOCKET;
+
 	std::cout<<"The server is waiting for a newest connection \n"<<std::endl;
-	currentclientsoc = SocketAccept(serversoc, (sockaddr_in*)&remote_addr);
+	socketparam.socket_fd = SocketAccept(serversoc, (sockaddr_in*)&(socketparam.remote_addr));
 
 	if (serversoc != INVALID_SOCKET)CreateListenThread();//服务器运行中则继续监听
 
-	if (currentclientsoc == INVALID_SOCKET)
+	if (socketparam.socket_fd == INVALID_SOCKET)
 	{
 		return_value = -1;
+		std::cout << "Accept fail! and exit ListenThreadFunc: 0x" << hex << GetCurrentThreadId ()<< std::endl;
 		//TRACE(("Accept fail! and exit listenthread: 0x%x\n"), GetCurrentThreadId());
 	}
 	else
 	{
-		clientmap_locker->Lock();
-		clientmap.insert(std::pair<HSocket, struct sockaddr_in>(currentclientsoc, remote_addr));//save client info(socketfd,ip,port...) to map
-		clientmap_locker->Unlock();
-
-
-		//return_value = ProcessClient(currentclientsoc);//while(1)
 
 		if (listen_numb < MAX_LISTENING_COUNT)
 		{
-			clientobjarray[client_numb++] = new ClientObj(currentclientsoc, RequestCallBackFunc);
+			ClientObj *clientobj_p = new ClientObj(socketparam, multicallbackfuncs);
+
+			clientmap_locker->Lock();
+			clientmap[socketparam] = clientobj_p;
+			//clientmap.insert(std::pair<SocketParams_t, ClientObj *>(socketparam, clientobj_p));//save client info(socketfd,ip,port...) to map
+			clientmap_locker->Unlock();
 		}
-		
+	
 		std::cout << "Create ClientObj finished and exit ListenThreadFunc: 0x"<< hex << GetCurrentThreadId() << std::endl;
 
-		//clientmap_locker->Lock();
-		//clientmap.erase(currentclientsoc);
-		//clientmap_locker->Unlock();
-
-		//SocketClose(currentclientsoc);
-		//TRACE(("Erase clientfd ,Close socket and exit ProcessClientFunc: 0x%x\n"), GetCurrentThreadId());
-		//std::cout << "Erase clientfd ,Close socket and exit ProcessClientFunc: 0x"<< hex << GetCurrentThreadId() << std::endl;
 	}
 
 	return return_value;
 
 }
-
-int JProtocol::PushRecvBuffToQueue(HSocket clientfd, char *buff, int buff_len)
+int JProtocol::RecoveryClientObjThread(void* p)
 {
-	if ((buff_len > 512) || (clientfd == INVALID_SOCKET))return -1;
-	char data[2048];
-	memset(data, 0x00, sizeof(data));
-	/*GOSPRINTF(data, sizeof(HSocket)+1, "%d", clientfd);*/
-	sprintf(data, "%d", clientfd);
-	memcpy(&data[sizeof(HSocket)], buff, buff_len);
-	jqueue.PushToQueue(data, buff_len + sizeof(HSocket));//push to fifo-buff
-	return 0;
-
+	JProtocol *arg = (JProtocol*)p;
+	int return_value = 0;
+	if (arg != NULL)
+	{
+		return_value = arg->RecoveryClientObjThreadFunc();
+	}
+	return return_value;
 }
-int JProtocol::ProcessClient(HSocket clientfd)
+int JProtocol::RecoveryClientObjThreadFunc()
 {
 	int return_value = 0;
-	//char *recvbuff = new char[BUFLENGTH];
-	char recvbuff[BUFLENGTH];
-	memset(recvbuff, 0x00, BUFLENGTH);
-	transresult_t rt;
-	StickDismantleOptions_t temp_option;
-	memset(&temp_option, 0x00, sizeof(StickDismantleOptions_t));
+	int len = 0;
+	char temp[512];
+	memset(temp, 0x00, 512);
+	SocketParams_t clientsocket_temp;
+	std::map<SocketParams_t, ClientObj *> ::iterator it;
+	int ret = 0;
 
-	std::string len_str;
-	len_str.clear();
-
-	//设置clientfd超时
-	SocketTimeOut(clientfd, socketoption.recvtimeout, socketoption.sendtimeout, socketoption.lingertimeout);
-	std::cout<<"Connected\n"<<std::endl;
-	while (!set_thread_exit_flag)
+	while ((ret = clientqueue.TakeFromQueue(temp, len, 200)) >= 0)
 	{
-		SocketRecv(clientfd, &recvbuff[0], BUFLENGTH, rt);
-		if (rt.nbytes > 0)
+		if (set_thread_exit_flag)break;
+		if (ret == SYN_OBJECT_o)
 		{
-			if ((recvbuff[0] == 'Q') && rt.nbytes == 1)//测试用
+			memcpy(&clientsocket_temp, temp, sizeof(SocketParams_t));
+			clientmap_locker->Lock();
+
+			it = clientmap.find(clientsocket_temp);
+			if (it != clientmap.end())
 			{
-				return_value = 0;
-				break;
+				delete it->second;
+				it->second = NULL;
+				it = clientmap.erase(it);
+				std::cout << "#clientmap.erase a client# \n" << std::endl;
 			}
-
-			//stickdismantle_locker->Lock();
-			//return_value = StickDismantleProtocol(clientfd, &recvbuff[0], rt.nbytes, temp_option);
-			//stickdismantle_locker->Unlock();
-
-			memset(&recvbuff[0], 0, BUFLENGTH);//clear recvbuf[BUFLENGTH];
-
-		}
-		else if ((rt.nbytes == -1) && (rt.nresult==1))
-		{
-			std::cout<<"SocketRecv Timeout\n"<<std::endl;
-		}
-		else if ((rt.nresult == -1))
-		{
-			std::cout<<"Client close socket\n"<<std::endl;
-			return_value = -1;
-			break;
+			else
+			{
+				std::cout << "#clientmap no find# \n" << std::endl;
+			}
+			memset(temp, 0x00, 512);
+			clientmap_locker->Unlock();
 		}
 		else
 		{
+			//timeout
 		}
-
 	}
 
+	std::cout << "exit RecoveryClientThreadFunc: 0x" << hex << GetCurrentThreadId() << std::endl;
 	return return_value;
+
 }
+void JProtocol::NotifyRecoveryClienObj(SocketParams_t clientsocket)
+{
+	if (pThis == NULL)exit(-1);
+	pThis->NotifyDeleleClienObjFunc(clientsocket);
+
+}
+void JProtocol::NotifyDeleleClienObjFunc(SocketParams_t clientsocket)
+{
+
+	clientqueue.PushToQueue(&clientsocket, sizeof(SocketParams_t));
+
+	std::cout << "#push clientqueue# \n" << std::endl;
+}
+
+
+
+
+//int JProtocol::PushRecvBuffToQueue(HSocket clientfd, char *buff, int buff_len)
+//{
+//	if ((buff_len > 512) || (clientfd == INVALID_SOCKET))return -1;
+//	char data[2048];
+//	memset(data, 0x00, sizeof(data));
+//	/*GOSPRINTF(data, sizeof(HSocket)+1, "%d", clientfd);*/
+//	sprintf(data, "%d", clientfd);
+//	memcpy(&data[sizeof(HSocket)], buff, buff_len);
+//	jqueue.PushToQueue(data, buff_len + sizeof(HSocket));//push to fifo-buff
+//	return 0;
+//
+//}
+//int JProtocol::ProcessClient(HSocket clientfd)
+//{
+//	int return_value = 0;
+//	//char *recvbuff = new char[BUFLENGTH];
+//	char recvbuff[BUFLENGTH];
+//	memset(recvbuff, 0x00, BUFLENGTH);
+//	transresult_t rt;
+//	StickDismantleOptions_t temp_option;
+//	memset(&temp_option, 0x00, sizeof(StickDismantleOptions_t));
+//
+//	std::string len_str;
+//	len_str.clear();
+//
+//	//设置clientfd超时
+//	SocketTimeOut(clientfd, socketoption.recvtimeout, socketoption.sendtimeout, socketoption.lingertimeout);
+//	std::cout<<"Connected\n"<<std::endl;
+//	while (!set_thread_exit_flag)
+//	{
+//		SocketRecv(clientfd, &recvbuff[0], BUFLENGTH, rt);
+//		if (rt.nbytes > 0)
+//		{
+//			if ((recvbuff[0] == 'Q') && rt.nbytes == 1)//测试用
+//			{
+//				return_value = 0;
+//				break;
+//			}
+//
+//			//stickdismantle_locker->Lock();
+//			//return_value = StickDismantleProtocol(clientfd, &recvbuff[0], rt.nbytes, temp_option);
+//			//stickdismantle_locker->Unlock();
+//
+//			memset(&recvbuff[0], 0, BUFLENGTH);//clear recvbuf[BUFLENGTH];
+//
+//		}
+//		else if ((rt.nbytes == -1) && (rt.nresult==1))
+//		{
+//			std::cout<<"SocketRecv Timeout\n"<<std::endl;
+//		}
+//		else if ((rt.nresult == -1))
+//		{
+//			std::cout<<"Client close socket\n"<<std::endl;
+//			return_value = -1;
+//			break;
+//		}
+//		else
+//		{
+//		}
+//
+//	}
+//
+//	return return_value;
+//}
 //int JProtocol::StickDismantleProtocol(HSocket clientfd, char *ptr, int ptr_len, StickDismantleOptions_t &option)
 //{
 //	int return_value = 0;
@@ -668,7 +626,8 @@ int JProtocol::SendDataToTheThirdParty(HSocket fd, std::string buff)
 	int return_value = 0;
 	int send_len = 0;
 	HSocket Objsoc = 0;
-	std::map<HSocket, struct sockaddr_in> ::iterator it;
+	//std::map<HSocket, struct sockaddr_in> ::iterator it;
+	std::map<SocketParams_t, ClientObj *> ::iterator it;
 
 	stringstream ss;
 	ss<< buff.size();
@@ -703,7 +662,7 @@ int JProtocol::SendDataToTheThirdParty(HSocket fd, std::string buff)
 			clientmap_locker->Lock();
 			for (it = clientmap.begin(); it != clientmap.end(); ++it)
 			{
-				Objsoc = it->first;
+				Objsoc = (it->first).socket_fd;
 				return_value = PhySocketSendData(Objsoc, phy_fragment.fragment_element, send_len);
 			}
 			clientmap_locker->Unlock();
@@ -723,7 +682,6 @@ int JProtocol::SendDataToTheThirdParty(HSocket fd, std::string buff)
 	Objsoc = INVALID_SOCKET;
 	return return_value;
 }
-
 void JProtocol::ConnectReply(HSocket dst_fd, std::string status, std::string reason)
 {
 	
@@ -960,7 +918,6 @@ void JProtocol::CallEndNotify(HSocket dst_fd, int src, int dst, std::string chan
 	std::cout<<"Send CallEndNotify\n"<<std::endl;
 
 }
-
 std::string JProtocol::CreateGuid()
 {
 	std::string strGuid = "", strValue;

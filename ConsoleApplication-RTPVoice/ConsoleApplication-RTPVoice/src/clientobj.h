@@ -27,19 +27,15 @@ typedef struct{
 	char		data[BUFLENGTH];
 
 }StickDismantleOptions_t;
+
 #pragma pack(pop)
+
+
 
 class ClientObj
 {
 public:
-	ClientObj(HSocket socketfd, void(*callBackFunc)(int, ResponeData));
-	bool IsClientObjActive()
-	{
-		if (clientfd != INVALID_SOCKET)
-			return true;
-		else
-			false;
-	}
+	ClientObj(SocketParams_t socketparam, MultiCallBackFuncs_t callbacks);
 	~ClientObj();
 
 private:
@@ -53,7 +49,9 @@ private:
 
 	//回调接口
 	void(*RequestCallBackFunc)(int, ResponeData);//请求类回调
+	void(*NotifyDeleteCallBackFunc)(SocketParams_t);//对象摧毁通知类回调
 	void onData(void(*func)(int, ResponeData), int command, ResponeData data);
+	void deOBJ(void(*func)(SocketParams_t), SocketParams_t clientsocket);
 	
 	
 	/*
@@ -89,9 +87,10 @@ private:
 	PROTOCOL_Ctrlr thePROTOCOL_Ctrlr;//协议结构
 	std::map <std::string, int>  statemap;//状态机
 	ILock *ondata_locker;
+	ILock *deobj_locker;
 	MyCreateThread * process_client_thread_p;
 	MyCreateThread * parse_thread_p;
-	HSocket clientfd;
+	SocketParams_t clientsocket;
 
 	char recvbuff[BUFLENGTH];
 	transresult_t rt;
