@@ -18,17 +18,6 @@
 #include "clientobj.h"
 #include <time.h>
 
-//#pragma pack(push, 1)
-//typedef struct{
-//
-//	 int32_t	bytes_remained;
-//	 uint32_t	count;
-//	 int32_t	pro_length;
-//	 char		data[BUFLENGTH];
-//
-//}StickDismantleOptions_t;
-//#pragma pack(pop)
-
 
 class JProtocol
 {
@@ -101,8 +90,6 @@ private:
 
 	HSocket serversoc;
 	struct sockaddr_in my_addr; /* loacl */
-	//socket初始化变量结构体
-	//socketoption_t socketoption;
 	/*
 	声明socket接口类
 	*/
@@ -118,7 +105,6 @@ private:
 	MyCreateThread *listen_thread_p[MAX_LISTENING_COUNT];
 	MyCreateThread *recovery_thread_p;
 
-	//int ProcessClient(HSocket clientfd);
 	void CreateListenThread();
 	static int ListenThread(void* p);
 	int ListenThreadFunc();
@@ -158,21 +144,8 @@ private:
 	*/
 	void InitProtocolData();
 
-	//ILock *ondata_locker;
-	//ILock *stickdismantle_locker;
 	ILock *clientmap_locker;
 
-	//ClientObj *clientobj_p;
-	//ClientObj *clientobjarray[MAX_LISTENING_COUNT];
-	//线程接口类指针
-
-	//MyCreateThread *parse_thread_p;
-
-	//FifoQueue jqueue;//JSON data queue
-
-	//PROTOCOL_Ctrlr thePROTOCOL_Ctrlr;//协议结构
-	//std::map <std::string, int>  statemap;//状态机
-	//std::map <HSocket, struct sockaddr_in>  clientmap;//save client-info
 	std::map <SocketParams_t , ClientObj *>  clientmap;//save client-info
 
 	bool set_thread_exit_flag;
@@ -190,21 +163,12 @@ private:
 	*/
 	std::string CreateGuid();
 	
-	/*
-	打包协议数据
-	*/
-	//int PushRecvBuffToQueue(HSocket clientfd, char *buff, int buff_len);
-	
+
 	/*
 	物理层发送协议数据包
 	*/
 	int PhySocketSendData(HSocket fd, char *buff, int buff_len);
 
-	/*
-	协议数据粘包/拆包函数
-	*/
-	//int StickDismantleProtocol(HSocket fd, char *buff, int len, StickDismantleOptions_t &ptr);
-	
 
 
 };

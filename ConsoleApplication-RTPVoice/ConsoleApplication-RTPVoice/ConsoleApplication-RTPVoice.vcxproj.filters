@@ -90,7 +90,7 @@
     <ClInclude Include="src\mymaster.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="src\clientobj.h">
+    <ClInclude Include="src\ClientObj\clientobj.h">
       <Filter>头文件\ClientObj</Filter>
     </ClInclude>
   </ItemGroup>
@@ -119,7 +119,7 @@
     <ClCompile Include="src\mymaster.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="src\clientobj.cpp">
+    <ClCompile Include="src\ClientObj\clientobj.cpp">
       <Filter>源文件\ClientObj</Filter>
     </ClCompile>
   </ItemGroup>
